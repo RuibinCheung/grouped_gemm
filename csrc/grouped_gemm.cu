@@ -46,12 +46,27 @@ bool cublas_init = false;
 void cublas_handle_init() {
   cublas_init = true;
 
+  const char* env_deterministic = std::getenv("HIPBLAS_DETERMINISTIC");
+  int deterministic = 0;
+  if (env_deterministic) {
+    try {
+      deterministic = std::atoi(env_deterministic);
+    } catch(const std::invalid_argument& e) {
+        throw std::runtime_error("Invalid HIPBLAS_DETERMINISTIC value");
+    }
+  }
+
   for (int i = 0; i < NUM_STREAM; i++) {
     cudaStreamCreateWithFlags(&cublas_stream[i], cudaStreamNonBlocking);
     cublasCreate(&cublas_handle[i]);
     cublasSetStream(cublas_handle[i], cublas_stream[i]);
     cudaEventCreate(&cublas_event[i]);
+
+    if (deterministic) {
+      hipblasSetAtomicsMode(cublas_handle[i], HIPBLAS_ATOMICS_NOT_ALLOWED);
+    }
   }
+
 }
 
 inline void cublas_current_wait_streams(cudaStream_t stream) {
